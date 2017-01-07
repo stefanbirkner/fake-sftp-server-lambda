@@ -8,14 +8,14 @@
         <version>12</version>
     </parent>
 
-    <artifactId>fake-sftp-server-rule</artifactId>
-    <version>2.1.0-SNAPSHOT</version>
+    <artifactId>fake-sftp-server-lambda</artifactId>
+    <version>1.0.0</version>
     <packaging>jar</packaging>
 
-    <name>Fake SFTP Server Rule</name>
-    <description>Fake SFTP Server Rule is a JUnit rule that runs an in-memory SFTP server.</description>
-    <url>https://github.com/stefanbirkner/fake-sftp-server-rule/</url>
-    <inceptionYear>2016</inceptionYear>
+    <name>Fake SFTP Server Lambda</name>
+    <description>Fake SFTP Server Lambda runs an in-memory SFTP server while your tests are running.</description>
+    <url>https://github.com/stefanbirkner/fake-sftp-server-lambda/</url>
+    <inceptionYear>2018</inceptionYear>
     <licenses>
         <license>
             <name>MIT License</name>
@@ -25,9 +25,9 @@
     </licenses>
 
     <scm>
-        <connection>scm:git:git://github.com/stefanbirkner/fake-sftp-server-rule.git</connection>
-        <developerConnection>scm:git:git@github.com:stefanbirkner/fake-sftp-server-rule.git</developerConnection>
-        <url>https://github.com/stefanbirkner/fake-sftp-server-rule/</url>
+        <connection>scm:git:git://github.com/stefanbirkner/fake-sftp-server-lambda.git</connection>
+        <developerConnection>scm:git:git@github.com:stefanbirkner/fake-sftp-server-lambda.git</developerConnection>
+        <url>https://github.com/stefanbirkner/fake-sftp-server-lambda/</url>
     </scm>
 
     <properties>
@@ -47,11 +47,6 @@
             <version>[2,)</version>
         </dependency>
         <dependency>
-            <groupId>junit</groupId>
-            <artifactId>junit-dep</artifactId>
-            <version>[4.9,)</version>
-        </dependency>
-        <dependency>
             <groupId>com.github.stefanbirkner</groupId>
             <artifactId>fishbowl</artifactId>
             <version>[1.4.1]</version>
@@ -67,6 +62,12 @@
             <groupId>commons-io</groupId>
             <artifactId>commons-io</artifactId>
             <version>[2.6]</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <version>[4.12]</version>
             <scope>test</scope>
         </dependency>
         <dependency>

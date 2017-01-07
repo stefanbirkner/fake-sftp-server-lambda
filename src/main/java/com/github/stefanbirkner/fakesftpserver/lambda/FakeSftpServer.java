@@ -1,13 +1,11 @@
-package com.github.stefanbirkner.fakesftpserver.rule;
+package com.github.stefanbirkner.fakesftpserver.lambda;
 
 import org.apache.sshd.server.SshServer;
 import org.apache.sshd.server.keyprovider.SimpleGeneratorHostKeyProvider;
 import org.apache.sshd.server.session.ServerSession;
 import org.apache.sshd.server.subsystem.sftp.SftpSubsystemFactory;
-import org.junit.rules.TestRule;
-import org.junit.runner.Description;
-import org.junit.runners.model.Statement;
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.Charset;
@@ -15,10 +13,7 @@ import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.attribute.UserPrincipalLookupService;
 import java.nio.file.spi.FileSystemProvider;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
 
 import static com.github.marschall.memoryfilesystem.MemoryFileSystemBuilder.newLinux;
 import static java.nio.file.FileVisitResult.CONTINUE;
@@ -26,136 +21,175 @@ import static java.nio.file.Files.*;
 import static java.util.Collections.singletonList;
 
 /**
- * Fake SFTP Server Rule is a JUnit rule that runs an in-memory SFTP server
- * while your tests are running.
- * <p>The Fake SFTP Server Rule is used by adding it to your test class.
+ * {@code FakeSftpServer} runs an in-memory SFTP server while your tests are
+ * running.
+ * <p>It is used by wrapping your test code with the method
+ * {@link #withSftpServer(ExceptionThrowingConsumer) withSftpServer}.
  * <pre>
  * public class TestClass {
- *   &#064;Rule
- *   public final FakeSftpServerRule sftpServer = new FakeSftpServerRule();
- *
- *   ...
+ *   &#064;Test
+ *   public void someTest() throws Exception {
+ *     withSftpServer(server -&gt; {
+ *       //test code
+ *     });
+ *   }
  * }
  * </pre>
- * <p>This rule starts a server before your test and stops it afterwards.
+ * <p>{@code withSftpServer} starts an SFTP server before executing the test
+ * code and shuts down the server afterwards. The test code uses the provided
+ * {@code FakeSftpServer} object to get information about the running server or
+ * use additional features of {@code FakeSftpServer}.
  * <p>By default the SFTP server listens on an auto-allocated port. During the
- * test this port can be obtained by {@link #getPort() sftpServer.getPort()}. It
- * can be changed by calling {@link #setPort(int)}. If you do this from within a
- * test then the server gets restarted. The time-consuming restart can be
- * avoided by setting the port immediately after creating the rule.
+ * test this port can be obtained by {@link #getPort() server.getPort()}. It
+ * can be changed by calling {@link #setPort(int)}. The server is restarted
+ * whenever this method is called.
  * <pre>
- * public class TestClass {
- *   &#064;Rule
- *   public final FakeSftpServerRule sftpServer = new FakeSftpServerRule()
- *       .setPort(1234);
- *
- *   ...
- * }
+ * withSftpServer(server -&gt; {
+ *   server.{@link #setPort(int) setPort}(1234);
+ *   //test code
+ * });
  * </pre>
  * <p>You can interact with the SFTP server by using the SFTP protocol with
  * password authentication. By default the server accepts every pair of
- * username and password, buy you can restrict it to specific pairs.
+ * username and password, but you can restrict it to specific pairs.
  * <pre>
- * public class TestClass {
- *   &#064;Rule
- *   public final FakeSftpServerRule sftpServer = new FakeSftpServerRule()
- *       .{@link #addUser(String, String) addUser}("username", "password");
- *
- *   ...
- * }
+ * withSftpServer(server -&gt; {
+ *   server.{@link #addUser(String, String) addUser}("username", "password");
+ *   //test code
+ * });
  * </pre>
- * <p>It is also possible to do this during the test using the same method.
  *
  * <h2>Testing code that reads files</h2>
  * <p>If you test code that reads files from an SFTP server then you need the
- * server to provide these files. Fake SFTP Server Rule has a shortcut for
- * uploading files to the server.
+ * server to provide these files. The server object has a shortcut for putting
+ * files to the server.
  * <pre>
  * &#064;Test
- * public void testTextFile() {
- *   {@link #putFile(String, String, Charset) sftpServer.putFile}("/directory/file.txt", "content of file", UTF_8);
- *   //code that downloads the file
+ * public void testTextFile() throws Exception {
+ *   withSftpServer(server -&gt; {
+ *     {@link #putFile(String, String, Charset) server.putFile}("/directory/file.txt", "content of file", UTF_8);
+ *     //code that downloads the file
+ *   });
  * }
  *
  * &#064;Test
- * public void testBinaryFile() {
- *   byte[] content = createContent();
- *   {@link #putFile(String, byte[]) sftpServer.putFile}("/directory/file.bin", content);
- *   //code that downloads the file
+ * public void testBinaryFile() throws Exception {
+ *   withSftpServer(server -&gt; {
+ *     byte[] content = createContent();
+ *     {@link #putFile(String, byte[]) server.putFile}("/directory/file.bin", content);
+ *     //code that downloads the file
+ *   });
  * }
  * </pre>
- * <p>Test data that is provided as an input stream can be uploaded directly
- * from that input stream. This is very handy if your test data is available as
- * a resource.
+ * <p>Test data that is provided as an input stream can be put directly from
+ * that input stream. This is very handy if your test data is available as a
+ * resource.
  * <pre>
  * &#064;Test
- * public void testFileFromInputStream() {
- *   InputStream is = getClass().getResourceAsStream("data.bin");
- *   {@link #putFile(String, InputStream) sftpServer.putFile}("/directory/file.bin", is);
- *   //code that downloads the file
+ * public void testFileFromInputStream() throws Exception {
+ *   withSftpServer(server -&gt; {
+ *     InputStream is = getClass().getResourceAsStream("data.bin");
+ *     {@link #putFile(String, InputStream) server.putFile}("/directory/file.bin", is);
+ *     //code that downloads the file
+ *   });
  * }
  * </pre>
  * <p>If you need an empty directory then you can use the method
  * {@link #createDirectory(String)}.
  * <pre>
  * &#064;Test
- * public void testDirectory() {
- *   sftpServer.{@link #createDirectory(String) createDirectory}("/a/directory");
- *   //code that reads from or writes to that directory
+ * public void testDirectory() throws Exception {
+ *   withSftpServer(server -&gt; {
+ *     {@link #createDirectory(String) server.createDirectory}("/a/directory");
+ *     //code that reads from or writes to that directory
+ *   });
  * }
  * </pre>
  * <p>You may create multiple directories at once with
  * {@link #createDirectories(String...)}.
  * <pre>
  * &#064;Test
- * public void testDirectories() {
- *   sftpServer.{@link #createDirectories(String...) createDirectories}(
- *     "/a/directory",
- *     "/another/directory"
- *   );
- *   //code that reads from or writes to that directories
+ * public void testDirectories() throws Exception {
+ *   withSftpServer(server -&gt; {
+ *     server.{@link #createDirectories(String...) createDirectories}(
+ *       "/a/directory",
+ *       "/another/directory"
+ *     );
+ *     //code that reads from or writes to that directories
+ *   });
  * }
  * </pre>
+ *
  * <h2>Testing code that writes files</h2>
  * <p>If you test code that writes files to an SFTP server then you need to
- * verify the upload. Fake SFTP Server Rule provides a shortcut for getting the
+ * verify the upload. The server object provides a shortcut for getting the
  * file's content from the server.
  * <pre>
  * &#064;Test
- * public void testTextFile() {
- *   //code that uploads the file
- *   String fileContent = {@link #getFileContent(String, Charset) sftpServer.getFileContent}("/directory/file.txt", UTF_8);
- *   ...
+ * public void testTextFile() throws Exception {
+ *   withSftpServer(server -&gt; {
+ *     //code that uploads the file
+ *     String fileContent = {@link #getFileContent(String, Charset) server.getFileContent}("/directory/file.txt", UTF_8);
+ *     //verify file content
+ *   });
  * }
  *
  * &#064;Test
- * public void testBinaryFile() {
- *   //code that uploads the file
- *   byte[] fileContent = {@link #getFileContent(String) sftpServer.getFileContent}("/directory/file.bin");
- *   ...
+ * public void testBinaryFile() throws Exception {
+ *   withSftpServer(server -&gt; {
+ *     //code that uploads the file
+ *     byte[] fileContent = {@link #getFileContent(String) server.getFileContent}("/directory/file.bin");
+ *     //verify file content
+ *   });
  * }
  * </pre>
  *
  * <h2>Testing existence of files</h2>
- * <p>If you want to check whether a file hast been created or deleted then you
- * can verify that it exists or not.
+ * <p>If you want to check whether a file was created or deleted then you can
+ * verify that it exists or not.
  * <pre>
  * &#064;Test
- * public void testFile() {
- *   //code that uploads or deletes the file
- *   boolean exists = {@link #existsFile(String) sftpServer.existsFile}("/directory/file.txt");
- *   ...
+ * public void testFile() throws Exception {
+ *   withSftpServer(server -&gt; {
+ *     //code that uploads or deletes the file
+ *     boolean exists = {@link #existsFile(String) server.existsFile}("/directory/file.txt");
+ *     //check value of exists variable
+ *   });
  * }
  * </pre>
  * <p>The method returns {@code true} iff the file exists and it is not a directory.
  *
  * <h2>Delete all files</h2>
  * <p>If you want to reuse the SFTP server then you can delete all files and
- * directories on the SFTP server. (This is rarely necessary because the rule
- * itself takes care that every test starts and ends with a clean SFTP server.)
- * <pre>{@link #deleteAllFilesAndDirectories() sftpServer.deleteAllFilesAndDirectories()};</pre>
+ * directories on the SFTP server. (This is rarely necessary because the method
+ * {@link #withSftpServer(ExceptionThrowingConsumer)} takes care that it starts
+ * and ends with a clean SFTP server.)
+ * <pre>server.{@link #deleteAllFilesAndDirectories() deleteAllFilesAndDirectories()};</pre>
  */
-public class FakeSftpServerRule implements TestRule {
+public class FakeSftpServer {
+
+    /**
+     * Starts an SFTP server, executes the test code and afterwards shuts
+     * down the server.
+     * @param testCode the code that is executed while the server is running
+     * @throws Exception any exception thrown by {@code testCode}
+     */
+    public static void withSftpServer(
+        ExceptionThrowingConsumer testCode
+    ) throws Exception {
+        try (
+            FileSystem fileSystem = createFileSystem()
+        ) {
+            FakeSftpServer server = new FakeSftpServer(fileSystem);
+            try (
+                Closeable closeServer = server.start(0)
+            ) {
+                testCode.accept(server);
+                server.withSftpServerFinished = true;
+            }
+        }
+    }
+
     private static final SimpleFileVisitor<Path> DELETE_FILES_AND_DIRECTORIES
         = new SimpleFileVisitor<Path>() {
             @Override
@@ -177,43 +211,42 @@ public class FakeSftpServerRule implements TestRule {
                 return super.postVisitDirectory(dir, exc);
             }
     };
-    private final Map<String, String> usernamesAndPasswords = new HashMap<>();
-    private int port = 0;
-
-    private FileSystem fileSystem;
+    private static final Random RANDOM = new Random();
+    private final FileSystem fileSystem;
     private SshServer server;
+    private boolean withSftpServerFinished = false;
+    private final Map<String, String> usernamesAndPasswords = new HashMap<>();
 
     /**
-     * Returns the port of the SFTP server. If the SFTP server listens on an
-     * auto-allocated port (that means you didn't call {@link #setPort(int)})
-     * then you can only call this method during the test.
-     *
-     * @return the port of the SFTP server.
-     * @throws IllegalStateException if you call the method outside of a test
-     * but haven't called {@link #setPort(int)}) before.
+     * {@code FakeSftpServer} cannot be created manually. It is always provided
+     * to an {@link ExceptionThrowingConsumer}
+     * by {@link #withSftpServer(ExceptionThrowingConsumer)}.
+     * @param fileSystem the file system that is used for storing the files
      */
-    public int getPort() {
-        if (port == 0)
-            return getPortFromServer();
-        else
-            return port;
+    private FakeSftpServer(
+        FileSystem fileSystem
+    ) {
+        this.fileSystem = fileSystem;
     }
 
-    private int getPortFromServer() {
-        verifyThatTestIsRunning("call getPort()");
+    /**
+     * Returns the port of the SFTP server.
+     *
+     * @return the port of the SFTP server.
+     */
+    public int getPort() {
+        verifyWithSftpServerIsNotFinished("call getPort()");
         return server.getPort();
     }
 
     /**
-     * Set the port of the SFTP server. The SFTP server gets restarted if you
-     * call {@code setPort} from within a test. The time-consuming restart can
-     * be avoided by setting the port immediately after creating the rule.
+     * Set the port of the SFTP server. The SFTP server is restarted when you
+     * call {@code setPort}.
      * @param port the port. Must be between 1 and 65535.
-     * @return the rule itself.
      * @throws IllegalArgumentException if the port is not between 1 and 65535.
      * @throws IllegalStateException if the server cannot be restarted.
      */
-    public FakeSftpServerRule setPort(
+    public void setPort(
         int port
     ) {
         if (port < 1 || port > 65535)
@@ -221,10 +254,8 @@ public class FakeSftpServerRule implements TestRule {
                 "Port cannot be set to " + port
                     + " because only ports between 1 and 65535 are valid."
             );
-        this.port = port;
-        if (server != null)
-            restartServer();
-        return this;
+        verifyWithSftpServerIsNotFinished("set port");
+        restartServer(port);
     }
 
     /**
@@ -235,9 +266,9 @@ public class FakeSftpServerRule implements TestRule {
      * different passwords then the last password is effective.
      * @param username the username.
      * @param password the password for the specified username.
-     * @return the rule itself.
+     * @return the server itself.
      */
-    public FakeSftpServerRule addUser(
+    public FakeSftpServer addUser(
         String username,
         String password
     ) {
@@ -245,10 +276,12 @@ public class FakeSftpServerRule implements TestRule {
         return this;
     }
 
-    private void restartServer() {
+    private void restartServer(
+        int port
+    ) {
         try {
             server.stop();
-            startServer(fileSystem);
+            start(port);
         } catch (IOException e) {
             throw new IllegalStateException(
                 "The SFTP server cannot be restarted.",
@@ -258,12 +291,12 @@ public class FakeSftpServerRule implements TestRule {
     }
 
     /**
-     * Put a text file on the SFTP folder. The file is available by the
+     * Puts a text file to the SFTP folder. The file is available by the
      * specified path.
-     * @param path the path to the file.
-     * @param content the files content.
-     * @param encoding the encoding of the file.
-     * @throws IOException if the file cannot be written.
+     * @param path the path to the file
+     * @param content the file's content
+     * @param encoding the encoding of the file
+     * @throws IOException if the file cannot be written
      */
     public void putFile(
         String path,
@@ -275,49 +308,49 @@ public class FakeSftpServerRule implements TestRule {
     }
 
     /**
-     * Put a file on the SFTP folder. The file is available by the specified
+     * Puts a file to the SFTP folder. The file is available by the specified
      * path.
-     * @param path the path to the file.
-     * @param content the files content.
-     * @throws IOException if the file cannot be written.
+     * @param path the path to the file
+     * @param content the file's content
+     * @throws IOException if the file cannot be written
      */
     public void putFile(
         String path,
         byte[] content
     ) throws IOException {
-        verifyThatTestIsRunning("upload file");
+        verifyWithSftpServerIsNotFinished("upload file");
         Path pathAsObject = fileSystem.getPath(path);
         ensureDirectoryOfPathExists(pathAsObject);
         write(pathAsObject, content);
     }
 
     /**
-     * Put a file on the SFTP folder. The file is available by the specified
-     * path. The file content is read from an {@code InputStream}.
-     * @param path the path to the file.
-     * @param is an {@code InputStream} that provides the file's content.
+     * Puts a file to the SFTP folder. The file is available by the specified
+     * path. The file's content is read from an {@code InputStream}.
+     * @param path the path to the file
+     * @param is an {@code InputStream} that provides the file's content
      * @throws IOException if the file cannot be written or the input stream
-     * cannot be read.
+     * cannot be read
      */
     public void putFile(
         String path,
         InputStream is
     ) throws IOException {
-        verifyThatTestIsRunning("upload file");
+        verifyWithSftpServerIsNotFinished("upload file");
         Path pathAsObject = fileSystem.getPath(path);
         ensureDirectoryOfPathExists(pathAsObject);
         copy(is, pathAsObject);
     }
 
     /**
-     * Create a directory on the SFTP server.
-     * @param path the directory's path.
-     * @throws IOException if the directory cannot be created.
+     * Creates a directory on the SFTP server.
+     * @param path the directory's path
+     * @throws IOException if the directory cannot be created
      */
     public void createDirectory(
         String path
     ) throws IOException {
-        verifyThatTestIsRunning("create directory");
+        verifyWithSftpServerIsNotFinished("create directory");
         Path pathAsObject = fileSystem.getPath(path);
         Files.createDirectories(pathAsObject);
     }
@@ -335,13 +368,12 @@ public class FakeSftpServerRule implements TestRule {
     }
 
     /**
-     * Get a text file from the SFTP server. The file is decoded using the
-     * specified encoding.
-     * @param path the path to the file.
-     * @param encoding the file's encoding.
-     * @return the content of the text file.
-     * @throws IOException if the file cannot be read.
-     * @throws IllegalStateException if not called from within a test.
+     * Gets a text file's content from the SFTP server. The content is decoded
+     * using the specified encoding.
+     * @param path the path to the file
+     * @param encoding the file's encoding
+     * @return the content of the text file
+     * @throws IOException if the file cannot be read
      */
     public String getFileContent(
         String path,
@@ -352,31 +384,29 @@ public class FakeSftpServerRule implements TestRule {
     }
 
     /**
-     * Get a file from the SFTP server.
-     * @param path the path to the file.
-     * @return the content of the file.
-     * @throws IOException if the file cannot be read.
-     * @throws IllegalStateException if not called from within a test.
+     * Gets a file from the SFTP server.
+     * @param path the path to the file
+     * @return the content of the file
+     * @throws IOException if the file cannot be read
      */
     public byte[] getFileContent(
         String path
     ) throws IOException {
-        verifyThatTestIsRunning("download file");
+        verifyWithSftpServerIsNotFinished("download file");
         Path pathAsObject = fileSystem.getPath(path);
         return readAllBytes(pathAsObject);
     }
 
     /**
-     * Checks the existence of a file. returns {@code true} iff the file exists
+     * Checks the existence of a file. Returns {@code true} iff the file exists
      * and it is not a directory.
-     * @param path the path to the file.
-     * @return {@code true} iff the file exists and it is not a directory.
-     * @throws IllegalStateException if not called from within a test.
+     * @param path the path to the file
+     * @return {@code true} iff the file exists and it is not a directory
      */
     public boolean existsFile(
         String path
     ) {
-        verifyThatTestIsRunning("check existence of file");
+        verifyWithSftpServerIsNotFinished("check existence of file");
         Path pathAsObject = fileSystem.getPath(path);
         return exists(pathAsObject) && !isDirectory(pathAsObject);
     }
@@ -391,39 +421,13 @@ public class FakeSftpServerRule implements TestRule {
             walkFileTree(directory, DELETE_FILES_AND_DIRECTORIES);
     }
 
-    @Override
-    public Statement apply(
-        Statement base,
-        Description description
-    ) {
-        return new Statement() {
-            @Override
-            public void evaluate() throws Throwable {
-                try (
-                    FileSystem fileSystem = createFileSystem()
-                ) {
-                    startServer(fileSystem);
-                    try {
-                        base.evaluate();
-                    } finally {
-                        server.stop();
-                        server = null;
-                    }
-                } finally {
-                    fileSystem = null;
-                }
-            }
-        };
-    }
-
-    private FileSystem createFileSystem(
+    private static FileSystem createFileSystem(
     ) throws IOException {
-        fileSystem = newLinux().build("FakeSftpServerRule@" + hashCode());
-        return fileSystem;
+        return newLinux().build("FakeSftpServer-" + RANDOM.nextInt());
     }
 
-    private SshServer startServer(
-        FileSystem fileSystem
+    private Closeable start(
+        int port
     ) throws IOException {
         SshServer server = SshServer.setUpDefaultServer();
         server.setPort(port);
@@ -437,7 +441,7 @@ public class FakeSftpServerRule implements TestRule {
         server.setFileSystemFactory(session -> new DoNotClose(fileSystem));
         server.start();
         this.server = server;
-        return server;
+        return () -> this.server.close();
     }
 
     private boolean authenticate(
@@ -460,14 +464,28 @@ public class FakeSftpServerRule implements TestRule {
             Files.createDirectories(directory);
     }
 
-    private void verifyThatTestIsRunning(
-        String mode
+    private void verifyWithSftpServerIsNotFinished(
+        String task
     ) {
-        if (fileSystem == null)
+        if (withSftpServerFinished)
             throw new IllegalStateException(
-                "Failed to " + mode + " because test has not been started or"
-                    + " is already finished."
+                "Failed to " + task + " because withSftpServer is already finished."
             );
+    }
+
+    /**
+     * Represents an operation that accepts a {@link FakeSftpServer} and returns
+     * no result. This functional interfaces is expected to contain test code.
+     */
+    public interface ExceptionThrowingConsumer {
+
+        /**
+         * Performs an operation.
+         *
+         * @param server a running {@link FakeSftpServer}
+         * @throws Exception any exception thrown by the operation
+         */
+        void accept(FakeSftpServer server) throws Exception;
     }
 
     private static class DoNotClose extends FileSystem {
@@ -541,7 +559,8 @@ public class FakeSftpServerRule implements TestRule {
         }
 
         @Override
-        public WatchService newWatchService() throws IOException {
+        public WatchService newWatchService(
+        ) throws IOException {
             return fileSystem.newWatchService();
         }
     }
