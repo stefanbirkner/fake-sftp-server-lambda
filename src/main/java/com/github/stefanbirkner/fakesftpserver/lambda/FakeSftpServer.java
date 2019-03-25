@@ -157,7 +157,7 @@ import static java.util.Collections.singletonList;
  *   });
  * }
  * </pre>
- * <p>The method returns {@code true} iff the file exists and it is not a directory.
+ * <p>The method returns {@code true} if the file exists and it is not a directory.
  *
  * <h2>Delete all files</h2>
  * <p>If you want to reuse the SFTP server then you can delete all files and
