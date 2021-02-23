@@ -1,3 +1,4 @@
+dist: trusty
 language: java
 install: mvn -DskipTests -Dgpg.skip install
 jdk:
