@@ -18,12 +18,30 @@ For JUnit 4 there is an alternative to Fake SFTP Server Lambda. Its name is
 Fake SFTP Server Lambda is available from
 [Maven Central](https://search.maven.org/#search|ga|1|fake-sftp-server-lambda).
 
+Fake SFTP Server Lambda uses the SFTP server of the Apache SSHD project. The API
+of the server changed in version 2.6.0 in a way that required changes in Fake
+SFTP Server Lambda. Therefore, there are two lines of development. As long as
+your project does not depend on an older version of Apache SSHD you should use
+Fake SFTP Server Lambda 2.0.0 which is compatible with Apache SSHD 2.6.0 and
+later.
+
     <dependency>
       <groupId>com.github.stefanbirkner</groupId>
       <artifactId>fake-sftp-server-lambda</artifactId>
-      <version>1.0.0</version>
+      <version>2.0.0</version>
       <scope>test</scope>
     </dependency>
+
+Users whose projects have a dependency to Apache SSHD with a version before 2.6.0
+must use Fake SFTP Server Lambda 1.0.1.
+
+    <dependency>
+      <groupId>com.github.stefanbirkner</groupId>
+      <artifactId>fake-sftp-server-lambda</artifactId>
+      <version>1.0.1</version>
+      <scope>test</scope>
+    </dependency>
+
 
 ## Usage
 
