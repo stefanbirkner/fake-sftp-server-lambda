@@ -1,12 +1,11 @@
 package com.github.stefanbirkner.fakesftpserver.lambda;
 
 import org.apache.sshd.common.file.FileSystemFactory;
-import org.apache.sshd.common.session.Session;
 import org.apache.sshd.common.session.SessionContext;
 import org.apache.sshd.server.SshServer;
 import org.apache.sshd.server.keyprovider.SimpleGeneratorHostKeyProvider;
 import org.apache.sshd.server.session.ServerSession;
-import org.apache.sshd.server.subsystem.sftp.SftpSubsystemFactory;
+import org.apache.sshd.sftp.server.SftpSubsystemFactory;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -587,13 +586,6 @@ public class FakeSftpServer {
         @Override
         public FileSystem createFileSystem(
             SessionContext session
-        ) {
-            return new DoNotClose(fileSystem);
-        }
-
-        // This method is used by sshd-sftp 2.0 to 2.4.0.
-        public FileSystem createFileSystem(
-            Session session
         ) {
             return new DoNotClose(fileSystem);
         }
