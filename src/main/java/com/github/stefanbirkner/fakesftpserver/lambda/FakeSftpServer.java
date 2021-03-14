@@ -1,5 +1,8 @@
 package com.github.stefanbirkner.fakesftpserver.lambda;
 
+import org.apache.sshd.common.file.FileSystemFactory;
+import org.apache.sshd.common.session.Session;
+import org.apache.sshd.common.session.SessionContext;
 import org.apache.sshd.server.SshServer;
 import org.apache.sshd.server.keyprovider.SimpleGeneratorHostKeyProvider;
 import org.apache.sshd.server.session.ServerSession;
@@ -438,7 +441,7 @@ public class FakeSftpServer {
          * In order to use the file system for multiple channels/sessions we
          * have to use a file system wrapper whose close() does nothing.
          */
-        server.setFileSystemFactory(session -> new DoNotClose(fileSystem));
+        server.setFileSystemFactory(new DoNotCloseFactory(fileSystem));
         server.start();
         this.server = server;
         return () -> this.server.close();
@@ -562,6 +565,37 @@ public class FakeSftpServer {
         public WatchService newWatchService(
         ) throws IOException {
             return fileSystem.newWatchService();
+        }
+    }
+
+    private static class DoNotCloseFactory implements FileSystemFactory {
+        final FileSystem fileSystem;
+
+        DoNotCloseFactory(
+            FileSystem fileSystem
+        ) {
+            this.fileSystem = fileSystem;
+        }
+
+        @Override
+        public Path getUserHomeDir(
+            SessionContext session
+        ) {
+            return null;
+        }
+
+        @Override
+        public FileSystem createFileSystem(
+            SessionContext session
+        ) {
+            return new DoNotClose(fileSystem);
+        }
+
+        // This method is used by sshd-sftp 2.0 to 2.4.0.
+        public FileSystem createFileSystem(
+            Session session
+        ) {
+            return new DoNotClose(fileSystem);
         }
     }
 }
