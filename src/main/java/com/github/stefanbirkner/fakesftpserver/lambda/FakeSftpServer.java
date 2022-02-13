@@ -214,18 +214,19 @@ public class FakeSftpServer {
             }
     };
     private static final Random RANDOM = new Random();
-    private final FileSystem fileSystem;
+    protected final FileSystem fileSystem;
     private SshServer server;
     private boolean withSftpServerFinished = false;
     private final Map<String, String> usernamesAndPasswords = new HashMap<>();
 
     /**
-     * {@code FakeSftpServer} cannot be created manually. It is always provided
+     * {@code FakeSftpServer} should not be created manually (unless by
+     * subclasses which know what they are doing). It is always provided
      * to an {@link ExceptionThrowingConsumer}
      * by {@link #withSftpServer(ExceptionThrowingConsumer)}.
      * @param fileSystem the file system that is used for storing the files
      */
-    private FakeSftpServer(
+    protected FakeSftpServer(
         FileSystem fileSystem
     ) {
         this.fileSystem = fileSystem;
@@ -423,12 +424,12 @@ public class FakeSftpServer {
             walkFileTree(directory, DELETE_FILES_AND_DIRECTORIES);
     }
 
-    private static FileSystem createFileSystem(
+    protected static FileSystem createFileSystem(
     ) throws IOException {
         return newLinux().build("FakeSftpServer-" + RANDOM.nextInt());
     }
 
-    private Closeable start(
+    protected Closeable start(
         int port
     ) throws IOException {
         SshServer server = SshServer.setUpDefaultServer();
