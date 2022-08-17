@@ -11,11 +11,15 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.ConnectException;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.List;
 import java.util.Vector;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static com.github.stefanbirkner.fakesftpserver.lambda.FakeSftpServer.withSftpServer;
 import static com.github.stefanbirkner.fishbowl.Fishbowl.exceptionThrownBy;
@@ -598,6 +602,70 @@ public class FakeSftpServerTest {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage(
                     "Failed to check existence of file because withSftpServer"
+                        + " is already finished."
+                );
+        }
+    }
+
+    public static class list_files_and_directories_check {
+        @Test
+        public void list_returns_all_existing_files_in_given_directory(
+        ) throws Exception {
+            withSftpServer(
+                server -> {
+                    uploadFile(
+                        server,
+                        "/dummy_directory/dummy_file.bin",
+                        DUMMY_CONTENT
+                    );
+                    uploadFile(
+                        server,
+                        "/dummy_directory/directory/dummy_file.bin",
+                        DUMMY_CONTENT
+                    );
+                    Stream<Path> fileList = server.listFilesAndDirectories(
+                        "/dummy_directory"
+                    );
+                    assertThat(fileList)
+                        .hasSize(2)
+                        .extracting(Path::toString)
+                        .contains("/dummy_directory/dummy_file.bin", "/dummy_directory/directory");
+                }
+            );
+        }
+
+        @Test
+        public void list_on_not_existing_directory_will_fail_with_exception(
+        ) throws Exception {
+            withSftpServer(
+                server -> {
+                    uploadFile(
+                        server,
+                        "/dummy_directory/dummy_file.bin",
+                        DUMMY_CONTENT
+                    );
+                    assertThatThrownBy(() -> server.listFilesAndDirectories(
+                        "/unknown_directory"
+                    )).isInstanceOf(NoSuchFileException.class);
+                }
+            );
+        }
+
+        @Test
+        public void list_cannot_be_checked_outside_of_the_lambda(
+        ) throws Exception {
+            AtomicReference<FakeSftpServer> serverCapture
+                = new AtomicReference<>();
+            withSftpServer(
+                serverCapture::set
+            );
+            Throwable exception = exceptionThrownBy(
+                () -> serverCapture.get().listFilesAndDirectories("/dummy_directory")
+            );
+            assertThat(exception)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage(
+                    "Failed to list files because withSftpServer"
                         + " is already finished."
                 );
         }

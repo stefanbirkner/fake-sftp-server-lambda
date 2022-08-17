@@ -16,6 +16,7 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.attribute.UserPrincipalLookupService;
 import java.nio.file.spi.FileSystemProvider;
 import java.util.*;
+import java.util.stream.Stream;
 
 import static com.github.marschall.memoryfilesystem.MemoryFileSystemBuilder.newLinux;
 import static java.nio.file.FileVisitResult.CONTINUE;
@@ -411,6 +412,21 @@ public class FakeSftpServer {
         verifyWithSftpServerIsNotFinished("check existence of file");
         Path pathAsObject = fileSystem.getPath(path);
         return exists(pathAsObject) && !isDirectory(pathAsObject);
+    }
+
+    /**
+     * List all files and directories in a given directory
+     * @param path the path to the directory
+     * @return a stream with of all files in the directory
+     * @throws IOException see {@link Files#list(Path)}
+     */
+    public Stream<Path> listFilesAndDirectories(
+        String path
+    ) throws IOException
+    {
+        verifyWithSftpServerIsNotFinished("list files");
+        Path pathAsObject = fileSystem.getPath(path);
+        return Files.list(pathAsObject);
     }
 
     /**
