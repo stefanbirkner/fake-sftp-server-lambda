@@ -75,11 +75,20 @@ this port can be obtained by `server.getPort()`. It can be changed by calling
     });
 
 You can interact with the SFTP server by using the SFTP protocol with password
-authentication. By default the server accepts every pair of username and
-password, but you can restrict it to specific pairs.
+or SSH key authentication. By default, the server accepts every pair of username
+and password and every SSH key. You can enforce authentication by registering
+credentials
 
     withSftpServer(server -> {
       server.addUser("username", "password");
+      ...
+    });
+
+or an SSH key (the server creates the key pair and provides you the private
+key)
+
+    withSftpServer(server -> {
+      PrivateKey privateKey = server.addSshKeyForUser("username");
       ...
     });
 

@@ -7,6 +7,7 @@ import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator.ReplaceUnderscores;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -14,7 +15,9 @@ import java.io.InputStream;
 import java.net.ConnectException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Vector;
+import java.security.*;
+import java.security.KeyPair;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -22,6 +25,9 @@ import static com.github.stefanbirkner.fakesftpserver.lambda.FakeSftpServer.with
 import static com.github.stefanbirkner.fishbowl.Fishbowl.exceptionThrownBy;
 import static com.github.stefanbirkner.fishbowl.Fishbowl.ignoreException;
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static java.nio.file.Files.createTempFile;
+import static java.nio.file.Files.write;
+import static java.util.Arrays.asList;
 import static org.apache.commons.io.IOUtils.toByteArray;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -92,7 +98,7 @@ class FakeSftpServerTest {
     @Nested
     class authentication {
         @Nested
-        class server_without_credentials {
+        class server_without_credentials_or_SSH_keys {
             @Test
             void the_server_accepts_connections_with_password(
             ) throws Exception {
@@ -106,6 +112,31 @@ class FakeSftpServerTest {
                         session.connect(TIMEOUT);
                     }
                 );
+            }
+
+            @Test
+            void the_server_accepts_connections_with_an_SSH_key(
+                @TempDir Path tempDir
+            ) throws Exception {
+                String anyPrivateKey = fileWithArbitraryPrivateKey(tempDir);
+                withSftpServer(
+                    server -> {
+                        JSCH.addIdentity(anyPrivateKey);
+                        Session session = createSessionForUser(
+                            "dummy user",
+                            server.getPort()
+                        );
+                        session.connect(TIMEOUT);
+                    }
+                );
+            }
+
+            private String fileWithArbitraryPrivateKey(
+                Path directory
+            ) throws NoSuchAlgorithmException, IOException {
+                KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("RSA");
+                KeyPair keyPair = keyPairGenerator.generateKeyPair();
+                return keyFile(directory, keyPair.getPrivate());
             }
         }
 
@@ -162,6 +193,101 @@ class FakeSftpServerTest {
                     }
                 );
             }
+        }
+
+        @Nested
+        class SSH_key {
+            @TempDir
+            Path tempDir;
+
+            @Test
+            public void the_server_accepts_connections_with_correct_private_key(
+            ) throws Exception {
+                withSftpServer(
+                    server -> {
+                        PrivateKey privateKey = server.addSshKeyForUser("dummy user");
+                        JSCH.addIdentity(
+                            keyFile(tempDir, privateKey)
+                        );
+                        Session session = createSessionForUser(
+                            "dummy user",
+                            server.getPort()
+                        );
+                        session.connect(TIMEOUT);
+                    }
+                );
+            }
+
+            @Test
+            public void the_server_rejects_connections_with_wrong_private_key(
+            ) throws Exception {
+                withSftpServer(
+                    server -> {
+                        server.addSshKeyForUser("dummy user");
+                        PrivateKey keyOfAnotherUser = server.addSshKeyForUser("another user");
+                        JSCH.addIdentity(
+                            keyFile(tempDir, keyOfAnotherUser)
+                        );
+                        Session session = createSessionForUser(
+                            "dummy user",
+                            server.getPort()
+                        );
+                        assertThatThrownBy(() -> session.connect(TIMEOUT))
+                            .isInstanceOf(Exception.class);
+                    }
+                );
+            }
+
+            @Test
+            public void the_server_rejects_connections_for_user_without_private_key(
+            ) throws Exception {
+                withSftpServer(
+                    server -> {
+                        // We need to create an SSH key, because servers without
+                        // registered credentials or SSH keys accept every
+                        // connection.
+                        server.addSshKeyForUser("another user");
+                        Session session = createSessionForUser(
+                            "dummy user",
+                            server.getPort()
+                        );
+                        assertThatThrownBy(() -> session.connect(TIMEOUT))
+                            .isInstanceOf(Exception.class);
+                    }
+                );
+            }
+
+            @Test
+            public void the_latest_key_is_effective_if_multiple_keys_are_created_for_a_user(
+            ) throws Exception {
+                withSftpServer(
+                    server -> {
+                        server.addSshKeyForUser("dummy user");
+                        PrivateKey privateKey = server.addSshKeyForUser("dummy user");
+                        JSCH.addIdentity(
+                            keyFile(tempDir, privateKey)
+                        );
+                        Session session = createSessionForUser(
+                            "dummy user",
+                            server.getPort()
+                        );
+                        session.connect(TIMEOUT);
+                    }
+                );
+            }
+        }
+
+        private String keyFile(
+            Path directory,
+            PrivateKey key
+        ) throws IOException {
+            Path keyFile = createTempFile(directory, "key_", ".tmp");
+            write(keyFile, asList(
+                "-----BEGIN PRIVATE KEY-----",
+                Base64.getMimeEncoder().encodeToString(key.getEncoded()),
+                "-----END PRIVATE KEY-----"
+            ));
+            return keyFile.toFile().getAbsolutePath();
         }
 
         private Session createSessionWithCredentials(
@@ -965,9 +1091,17 @@ class FakeSftpServerTest {
         String password,
         int port
     ) throws JSchException {
+        Session session = createSessionForUser(username, port);
+        session.setPassword(password);
+        return session;
+    }
+
+    private static Session createSessionForUser(
+        String username,
+        int port
+    ) throws JSchException {
         Session session = JSCH.getSession(username, "127.0.0.1", port);
         session.setConfig("StrictHostKeyChecking", "no");
-        session.setPassword(password);
         return session;
     }
 

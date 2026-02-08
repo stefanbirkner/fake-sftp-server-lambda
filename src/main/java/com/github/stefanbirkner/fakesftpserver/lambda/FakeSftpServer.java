@@ -15,12 +15,14 @@ import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.attribute.UserPrincipalLookupService;
 import java.nio.file.spi.FileSystemProvider;
+import java.security.*;
 import java.util.*;
 
 import static com.github.marschall.memoryfilesystem.MemoryFileSystemBuilder.newLinux;
 import static java.nio.file.FileVisitResult.CONTINUE;
 import static java.nio.file.Files.*;
 import static java.util.Collections.singletonList;
+import static org.apache.sshd.common.config.keys.KeyUtils.compareKeys;
 
 /**
  * {@code FakeSftpServer} runs an in-memory SFTP server while your tests are
@@ -218,6 +220,7 @@ public class FakeSftpServer {
     private SshServer server;
     private boolean withSftpServerFinished = false;
     private final Map<String, String> usernamesAndPasswords = new HashMap<>();
+    private final Map<String, PublicKey> usernamesAndPublicKeys = new HashMap<>();
 
     /**
      * {@code FakeSftpServer} cannot be created manually. It is always provided
@@ -261,9 +264,29 @@ public class FakeSftpServer {
     }
 
     /**
+     * Register a user for SSH key based authentication. {@code FakeSftpServer}
+     * generates an SSH key pair for the user and returns the pair's private
+     * key. The private key has to be used for authentication.
+     * <p>If {@code addSshKeyForUser} is called multiple times with the same
+     * username then the latest key is effective.
+     * <p>After registering a username it is only possible to connect to the
+     * server with one of the registered username/password pairs or an SSH key.
+     * @param username the username.
+     * @return the private key that has to be used for authentication.
+     */
+    public PrivateKey addSshKeyForUser(
+        String username
+    ) throws NoSuchAlgorithmException {
+        KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("RSA");
+        KeyPair keyPair = keyPairGenerator.generateKeyPair();
+        usernamesAndPublicKeys.put(username, keyPair.getPublic());
+        return keyPair.getPrivate();
+    }
+
+    /**
      * Register a username with its password. After registering a username
      * it is only possible to connect to the server with one of the registered
-     * username/password pairs.
+     * username/password pairs or an SSH key.
      * <p>If {@code addUser} is called multiple times with the same username but
      * different passwords then the last password is effective.
      * @param username the username.
@@ -435,6 +458,7 @@ public class FakeSftpServer {
         server.setPort(port);
         server.setKeyPairProvider(new SimpleGeneratorHostKeyProvider());
         server.setPasswordAuthenticator(this::authenticate);
+        server.setPublickeyAuthenticator(this::authenticatePublicKey);
         server.setSubsystemFactories(singletonList(new SftpSubsystemFactory()));
         /* When a channel is closed SshServer calls close() on the file system.
          * In order to use the file system for multiple channels/sessions we
@@ -456,7 +480,8 @@ public class FakeSftpServer {
     }
 
     private boolean isNoUserRegistered() {
-        return usernamesAndPasswords.isEmpty();
+        return usernamesAndPasswords.isEmpty()
+            && usernamesAndPublicKeys.isEmpty();
     }
 
     private boolean isCorrectPassword(String username, String password) {
@@ -464,6 +489,15 @@ public class FakeSftpServer {
             usernamesAndPasswords.get(username),
             password
         );
+    }
+
+    private boolean authenticatePublicKey(
+        String username,
+        PublicKey publicKey,
+        ServerSession session
+    ) {
+        PublicKey registeredKey = usernamesAndPublicKeys.get(username);
+        return compareKeys(publicKey, registeredKey);
     }
 
     private void ensureDirectoryOfPathExists(
