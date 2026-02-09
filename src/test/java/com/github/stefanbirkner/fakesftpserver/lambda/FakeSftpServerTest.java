@@ -3,9 +3,10 @@ package com.github.stefanbirkner.fakesftpserver.lambda;
 import com.jcraft.jsch.*;
 import org.apache.commons.io.IOUtils;
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
-import org.junit.Test;
-import org.junit.experimental.runners.Enclosed;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.DisplayNameGeneration;
+import org.junit.jupiter.api.DisplayNameGenerator.ReplaceUnderscores;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -29,17 +30,18 @@ import static org.assertj.core.api.Assertions.catchThrowable;
 /* Wording according to the draft:
  * http://tools.ietf.org/html/draft-ietf-secsh-filexfer-13
  */
-@RunWith(Enclosed.class)
-public class FakeSftpServerTest {
+@DisplayNameGeneration(ReplaceUnderscores.class)
+class FakeSftpServerTest {
     private static final byte[] DUMMY_CONTENT = new byte[]{1, 4, 2, 4, 2, 4};
     private static final int DUMMY_PORT = 46354;
     private static final InputStream DUMMY_STREAM = new ByteArrayInputStream(DUMMY_CONTENT);
     private static final JSch JSCH = new JSch();
     private static final int TIMEOUT = 200;
 
-    public static class round_trip {
+    @Nested
+    class round_trip {
         @Test
-        public void a_file_that_is_written_to_the_SFTP_server_can_be_read(
+        void a_file_that_is_written_to_the_SFTP_server_can_be_read(
         ) throws Exception {
             withSftpServer(
                 server -> {
@@ -61,10 +63,11 @@ public class FakeSftpServerTest {
         }
     }
 
-    public static class connection {
+    @Nested
+    class connection {
 
         @Test
-        public void multiple_connections_to_the_server_are_possible(
+        void multiple_connections_to_the_server_are_possible(
         ) throws Exception {
             withSftpServer(
                 server -> {
@@ -75,7 +78,7 @@ public class FakeSftpServerTest {
         }
 
         @Test
-        public void a_client_can_connect_to_the_server_at_a_user_specified_port(
+        void a_client_can_connect_to_the_server_at_a_user_specified_port(
         ) throws Exception {
             withSftpServer(
                 server -> {
@@ -86,11 +89,12 @@ public class FakeSftpServerTest {
         }
     }
 
-    @RunWith(Enclosed.class)
-    public static class authentication {
-        public static class server_without_credentials {
+    @Nested
+    class authentication {
+        @Nested
+        class server_without_credentials {
             @Test
-            public void the_server_accepts_connections_with_password(
+            void the_server_accepts_connections_with_password(
             ) throws Exception {
                 withSftpServer(
                     server -> {
@@ -105,9 +109,10 @@ public class FakeSftpServerTest {
             }
         }
 
-        public static class server_with_credentials {
+        @Nested
+        class server_with_credentials {
             @Test
-            public void the_server_accepts_connections_with_correct_password(
+            void the_server_accepts_connections_with_correct_password(
             ) throws Exception {
                 withSftpServer(
                     server -> {
@@ -123,7 +128,7 @@ public class FakeSftpServerTest {
             }
 
             @Test
-            public void the_server_rejects_connections_with_wrong_password(
+            void the_server_rejects_connections_with_wrong_password(
             ) throws Exception {
                 withSftpServer(
                     server -> {
@@ -141,7 +146,7 @@ public class FakeSftpServerTest {
             }
 
             @Test
-            public void the_last_password_is_effective_if_addUser_is_called_multiple_times(
+            void the_last_password_is_effective_if_addUser_is_called_multiple_times(
             ) throws Exception {
                 withSftpServer(
                     server -> {
@@ -159,7 +164,7 @@ public class FakeSftpServerTest {
             }
         }
 
-        private static Session createSessionWithCredentials(
+        private Session createSessionWithCredentials(
             FakeSftpServer server,
             String username,
             String password
@@ -169,7 +174,7 @@ public class FakeSftpServerTest {
             );
         }
 
-        private static void assertAuthenticationFails(
+        private void assertAuthenticationFails(
             ThrowingCallable connectToServer
         ) {
             assertThatThrownBy(connectToServer)
@@ -178,11 +183,12 @@ public class FakeSftpServerTest {
         }
     }
 
-    @RunWith(Enclosed.class)
-    public static class file_upload {
-        public static class a_text_file {
+    @Nested
+    class file_upload {
+        @Nested
+        class a_text_file {
             @Test
-            public void that_is_put_to_root_directory_by_the_server_object_can_be_read_from_server(
+            void that_is_put_to_root_directory_by_the_server_object_can_be_read_from_server(
             ) throws Exception {
                 withSftpServer(
                     server -> {
@@ -199,7 +205,7 @@ public class FakeSftpServerTest {
             }
 
             @Test
-            public void that_is_put_to_directory_by_the_server_object_can_be_read_from_server(
+            void that_is_put_to_directory_by_the_server_object_can_be_read_from_server(
             ) throws Exception {
                 withSftpServer(
                     server -> {
@@ -219,7 +225,7 @@ public class FakeSftpServerTest {
             }
 
             @Test
-            public void cannot_be_put_outside_of_the_lambda(
+            void cannot_be_put_outside_of_the_lambda(
             ) throws Exception {
                 AtomicReference<FakeSftpServer> serverCapture
                     = new AtomicReference<>();
@@ -240,9 +246,10 @@ public class FakeSftpServerTest {
             }
         }
 
-        public static class a_binary_file {
+        @Nested
+        class a_binary_file {
             @Test
-            public void that_is_put_to_root_directory_by_the_server_object_can_be_read_from_server(
+            void that_is_put_to_root_directory_by_the_server_object_can_be_read_from_server(
             ) throws Exception {
                 withSftpServer(
                     server -> {
@@ -254,7 +261,7 @@ public class FakeSftpServerTest {
             }
 
             @Test
-            public void that_is_put_to_directory_by_the_server_object_can_be_read_from_server(
+            void that_is_put_to_directory_by_the_server_object_can_be_read_from_server(
             ) throws Exception {
                 withSftpServer(
                     server -> {
@@ -272,7 +279,7 @@ public class FakeSftpServerTest {
             }
 
             @Test
-            public void cannot_be_put_outside_of_the_lambda(
+            void cannot_be_put_outside_of_the_lambda(
             ) throws Exception {
                 AtomicReference<FakeSftpServer> serverCapture
                     = new AtomicReference<>();
@@ -294,9 +301,10 @@ public class FakeSftpServerTest {
             }
         }
 
-        public static class a_file_from_a_stream {
+        @Nested
+        class a_file_from_a_stream {
             @Test
-            public void that_is_put_to_root_directory_by_the_server_object_can_be_read_from_server(
+            void that_is_put_to_root_directory_by_the_server_object_can_be_read_from_server(
             ) throws Exception {
                 withSftpServer(
                     server -> {
@@ -309,7 +317,7 @@ public class FakeSftpServerTest {
             }
 
             @Test
-            public void that_is_put_to_directory_by_the_server_object_can_be_read_from_server(
+            void that_is_put_to_directory_by_the_server_object_can_be_read_from_server(
             ) throws Exception {
                 withSftpServer(
                     server -> {
@@ -325,7 +333,7 @@ public class FakeSftpServerTest {
             }
 
             @Test
-            public void cannot_be_put_outside_of_the_lambda(
+            void cannot_be_put_outside_of_the_lambda(
             ) throws Exception {
                 AtomicReference<FakeSftpServer> serverCapture
                     = new AtomicReference<>();
@@ -348,12 +356,13 @@ public class FakeSftpServerTest {
         }
     }
 
-    @RunWith(Enclosed.class)
-    public static class directory_creation {
+    @Nested
+    class directory_creation {
 
-        public static class a_single_directory {
+        @Nested
+        class a_single_directory {
             @Test
-            public void that_is_created_by_the_server_object_can_be_read_by_a_client(
+            void that_is_created_by_the_server_object_can_be_read_by_a_client(
             ) throws Exception {
                 withSftpServer(
                     server -> {
@@ -364,7 +373,7 @@ public class FakeSftpServerTest {
             }
 
             @Test
-            public void cannot_be_created_outside_of_the_lambda(
+            void cannot_be_created_outside_of_the_lambda(
             ) throws Exception {
                 AtomicReference<FakeSftpServer> serverCapture
                     = new AtomicReference<>();
@@ -383,9 +392,10 @@ public class FakeSftpServerTest {
             }
         }
 
-        public static class multiple_directories {
+        @Nested
+        class multiple_directories {
             @Test
-            public void that_are_created_by_the_server_object_can_be_read_by_a_client(
+            void that_are_created_by_the_server_object_can_be_read_by_a_client(
             ) throws Exception {
                 withSftpServer(
                     server -> {
@@ -400,7 +410,7 @@ public class FakeSftpServerTest {
             }
 
             @Test
-            public void cannot_be_created_outside_of_the_lambda(
+            void cannot_be_created_outside_of_the_lambda(
             ) throws Exception {
                 AtomicReference<FakeSftpServer> serverCapture
                     = new AtomicReference<>();
@@ -422,7 +432,7 @@ public class FakeSftpServerTest {
             }
         }
 
-        private static void assertEmptyDirectory(
+        private void assertEmptyDirectory(
             FakeSftpServer server,
             String directory
         ) throws JSchException, SftpException {
@@ -435,11 +445,12 @@ public class FakeSftpServerTest {
         }
     }
 
-    @RunWith(Enclosed.class)
-    public static class file_download {
-        public static class a_text_file {
+    @Nested
+    class file_download {
+        @Nested
+        class a_text_file {
             @Test
-            public void that_is_written_to_the_server_can_be_retrieved_by_the_server_object(
+            void that_is_written_to_the_server_can_be_retrieved_by_the_server_object(
             ) throws Exception {
                 withSftpServer(
                     server -> {
@@ -459,7 +470,7 @@ public class FakeSftpServerTest {
             }
 
             @Test
-            public void cannot_be_retrieved_outside_of_the_lambda(
+            void cannot_be_retrieved_outside_of_the_lambda(
             ) throws Exception {
                 AtomicReference<FakeSftpServer> serverCapture
                     = new AtomicReference<>();
@@ -487,9 +498,10 @@ public class FakeSftpServerTest {
             }
         }
 
-        public static class a_binary_file {
+        @Nested
+        class a_binary_file {
             @Test
-            public void that_is_written_to_the_server_can_be_retrieved_by_the_server_object(
+            void that_is_written_to_the_server_can_be_retrieved_by_the_server_object(
             ) throws Exception {
                 withSftpServer(
                     server -> {
@@ -507,7 +519,7 @@ public class FakeSftpServerTest {
             }
 
             @Test
-            public void cannot_be_retrieved_outside_of_the_lambda(
+            void cannot_be_retrieved_outside_of_the_lambda(
             ) throws Exception {
                 AtomicReference<FakeSftpServer> serverCapture
                     = new AtomicReference<>();
@@ -534,10 +546,11 @@ public class FakeSftpServerTest {
         }
     }
 
-    public static class file_existence_check {
+    @Nested
+    class file_existence_check {
 
         @Test
-        public void exists_returns_true_for_a_file_that_exists_on_the_server(
+        void exists_returns_true_for_a_file_that_exists_on_the_server(
         ) throws Exception {
             withSftpServer(
                 server -> {
@@ -555,7 +568,7 @@ public class FakeSftpServerTest {
         }
 
         @Test
-        public void exists_returns_false_for_a_file_that_does_not_exists_on_the_server(
+        void exists_returns_false_for_a_file_that_does_not_exists_on_the_server(
         ) throws Exception {
             withSftpServer(
                 server -> {
@@ -568,7 +581,7 @@ public class FakeSftpServerTest {
         }
 
         @Test
-        public void exists_returns_false_for_a_directory_that_exists_on_the_server(
+        void exists_returns_false_for_a_directory_that_exists_on_the_server(
         ) throws Exception {
             withSftpServer(
                 server -> {
@@ -584,7 +597,7 @@ public class FakeSftpServerTest {
         }
 
         @Test
-        public void existence_of_a_file_cannot_be_checked_outside_of_the_lambda(
+        void existence_of_a_file_cannot_be_checked_outside_of_the_lambda(
         ) throws Exception {
             AtomicReference<FakeSftpServer> serverCapture
                 = new AtomicReference<>();
@@ -603,9 +616,10 @@ public class FakeSftpServerTest {
         }
     }
 
-    public static class server_shutdown {
+    @Nested
+    class server_shutdown {
         @Test
-        public void after_a_successful_test_SFTP_server_is_shutdown(
+        void after_a_successful_test_SFTP_server_is_shutdown(
         ) throws Exception {
             AtomicInteger portCapture = new AtomicInteger();
             withSftpServer(
@@ -617,7 +631,7 @@ public class FakeSftpServerTest {
         }
 
         @Test
-        public void after_an_erroneous_test_SFTP_server_is_shutdown(
+        void after_an_erroneous_test_SFTP_server_is_shutdown(
         ) throws Exception {
             AtomicInteger portCapture = new AtomicInteger();
             ignoreException(
@@ -632,7 +646,7 @@ public class FakeSftpServerTest {
         }
 
         @Test
-        public void after_a_test_first_SFTP_server_is_shutdown_when_port_was_changed_during_test(
+        void after_a_test_first_SFTP_server_is_shutdown_when_port_was_changed_during_test(
         ) throws Exception {
             AtomicInteger portCapture = new AtomicInteger();
             withSftpServer(
@@ -645,7 +659,7 @@ public class FakeSftpServerTest {
         }
 
         @Test
-        public void after_a_test_second_SFTP_server_is_shutdown_when_port_was_changed_during_test(
+        void after_a_test_second_SFTP_server_is_shutdown_when_port_was_changed_during_test(
         ) throws Exception {
             withSftpServer(
                 server -> {
@@ -671,9 +685,10 @@ public class FakeSftpServerTest {
         }
     }
 
-    public static class port_selection {
+    @Nested
+    class port_selection {
         @Test
-        public void by_default_two_servers_run_at_different_ports(
+        void by_default_two_servers_run_at_different_ports(
         ) throws Exception {
             AtomicInteger portCaptureForFirstServer = new AtomicInteger();
             AtomicInteger portCaptureForSecondServer = new AtomicInteger();
@@ -694,7 +709,7 @@ public class FakeSftpServerTest {
         }
 
         @Test
-        public void the_port_can_be_changed_during_the_test(
+        void the_port_can_be_changed_during_the_test(
         ) throws Exception {
             withSftpServer(
                 server -> {
@@ -705,7 +720,7 @@ public class FakeSftpServerTest {
         }
 
         @Test
-        public void it_is_not_possible_to_set_a_negative_port(
+        void it_is_not_possible_to_set_a_negative_port(
         ) throws Exception {
             assertThatThrownBy(
                 () -> withSftpServer(
@@ -720,7 +735,7 @@ public class FakeSftpServerTest {
         }
 
         @Test
-        public void it_is_not_possible_to_set_port_zero(
+        void it_is_not_possible_to_set_port_zero(
         ) throws Exception {
             assertThatThrownBy(
                 () -> withSftpServer(
@@ -735,7 +750,7 @@ public class FakeSftpServerTest {
         }
 
         @Test
-        public void the_port_can_be_set_to_1024(
+        void the_port_can_be_set_to_1024(
         ) throws Exception {
             //In a perfect world I would test to set port to 1 but the lowest
             //port that can be used by a non-root user is 1024
@@ -745,7 +760,7 @@ public class FakeSftpServerTest {
         }
 
         @Test
-        public void the_server_can_be_run_at_port_65535(
+        void the_server_can_be_run_at_port_65535(
         ) throws Exception {
             withSftpServer(
                 server -> {
@@ -756,7 +771,7 @@ public class FakeSftpServerTest {
         }
 
         @Test
-        public void it_is_not_possible_to_set_a_port_greater_than_65535(
+        void it_is_not_possible_to_set_a_port_greater_than_65535(
         ) throws Exception {
             assertThatThrownBy(
                 () -> withSftpServer(
@@ -771,7 +786,7 @@ public class FakeSftpServerTest {
         }
 
         @Test
-        public void the_port_cannot_be_set_outside_of_the_lambda(
+        void the_port_cannot_be_set_outside_of_the_lambda(
         ) throws Exception {
             AtomicReference<FakeSftpServer> serverCapture
                 = new AtomicReference<>();
@@ -790,9 +805,10 @@ public class FakeSftpServerTest {
         }
     }
 
-    public static class port_query {
+    @Nested
+    class port_query {
         @Test
-        public void can_be_read_during_the_test(
+        void can_be_read_during_the_test(
         ) throws Exception {
             AtomicInteger portCapture = new AtomicInteger();
             withSftpServer(
@@ -802,7 +818,7 @@ public class FakeSftpServerTest {
         }
 
         @Test
-        public void cannot_be_read_after_the_test(
+        void cannot_be_read_after_the_test(
         ) throws Exception {
             AtomicReference<FakeSftpServer> serverCapture
                 = new AtomicReference<>();
@@ -822,10 +838,11 @@ public class FakeSftpServerTest {
         }
     }
 
-    public static class cleanup {
+    @Nested
+    class cleanup {
 
         @Test
-        public void deletes_file_in_root_directory(
+        void deletes_file_in_root_directory(
         ) throws Exception {
             withSftpServer(
                 server -> {
@@ -844,7 +861,7 @@ public class FakeSftpServerTest {
         }
 
         @Test
-        public void deletes_file_in_directory(
+        void deletes_file_in_directory(
         ) throws Exception {
             withSftpServer(
                 server -> {
@@ -863,7 +880,7 @@ public class FakeSftpServerTest {
         }
 
         @Test
-        public void deletes_directory(
+        void deletes_directory(
         ) throws Exception {
             withSftpServer(
                 server -> {
@@ -878,14 +895,14 @@ public class FakeSftpServerTest {
         }
 
         @Test
-        public void works_on_an_empty_filesystem(
+        void works_on_an_empty_filesystem(
         ) throws Exception {
             withSftpServer(
                 FakeSftpServer::deleteAllFilesAndDirectories
             );
         }
 
-        private static void assertFileDoesNotExist(
+        private void assertFileDoesNotExist(
             FakeSftpServer server,
             String path
         ) {
@@ -893,7 +910,7 @@ public class FakeSftpServerTest {
             assertThat(exists).isFalse();
         }
 
-        private static void assertDirectoryDoesNotExist(
+        private void assertDirectoryDoesNotExist(
             FakeSftpServer server,
             String directory
         ) throws JSchException {
@@ -910,13 +927,13 @@ public class FakeSftpServerTest {
         }
     }
 
-    private static Session connectToServer(
+    private Session connectToServer(
         FakeSftpServer server
     ) throws JSchException {
         return connectToServerAtPort(server.getPort());
     }
 
-    private static Session connectToServerAtPort(
+    private Session connectToServerAtPort(
         int port
     ) throws JSchException {
         Session session = createSessionWithCredentials(
@@ -926,7 +943,7 @@ public class FakeSftpServerTest {
         return session;
     }
 
-    private static ChannelSftp connectSftpChannel(
+    private ChannelSftp connectSftpChannel(
         Session session
     ) throws JSchException {
         ChannelSftp channel = (ChannelSftp) session.openChannel("sftp");
@@ -934,7 +951,7 @@ public class FakeSftpServerTest {
         return channel;
     }
 
-    private static void connectAndDisconnect(
+    private void connectAndDisconnect(
         FakeSftpServer server
     ) throws JSchException {
         Session session = connectToServer(server);
@@ -954,7 +971,7 @@ public class FakeSftpServerTest {
         return session;
     }
 
-    private static byte[] downloadFile(
+    private byte[] downloadFile(
         FakeSftpServer server,
         String path
     ) throws JSchException, SftpException, IOException {
@@ -969,7 +986,7 @@ public class FakeSftpServerTest {
         }
     }
 
-    private static void uploadFile(
+    private void uploadFile(
         FakeSftpServer server,
         String pathAsString,
         byte[] content
