@@ -1,6 +1,7 @@
 # Fake SFTP Server Lambda
 
-[![Build Status](https://travis-ci.org/stefanbirkner/fake-sftp-server-lambda.svg?branch=master)](https://travis-ci.org/stefanbirkner/fake-sftp-server-lambda)
+
+![Build Status](https://github.com/stefanbirkner/fake-sftp-server-lambda/actions/workflows/ci.yml/badge.svg?branch=main)
 
 Fake SFTP Server Lambda runs an in-memory SFTP server while your tests are
 running. It uses the SFTP server of the
@@ -213,9 +214,9 @@ want to contribute code then
 The basic coding style is described in the
 [EditorConfig](http://editorconfig.org/) file `.editorconfig`.
 
-Fake SFTP Server Lambda supports [Travis CI](https://travis-ci.org/) for
-continuous integration. Your pull request will be automatically build by Travis
-CI.
+Fake SFTP Server Lambda supports
+[GitHub Actions](https://help.github.com/en/actions). Each pull request is
+automatically built and tested.
 
 
 ## Release Guide
