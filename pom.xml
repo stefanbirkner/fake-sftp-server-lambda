@@ -9,7 +9,7 @@
     </parent>
 
     <artifactId>fake-sftp-server-lambda</artifactId>
-    <version>2.0.1-SNAPSHOT</version>
+    <version>2.0.1</version>
     <packaging>jar</packaging>
 
     <name>Fake SFTP Server Lambda</name>
@@ -44,7 +44,14 @@
         <dependency>
             <groupId>org.apache.sshd</groupId>
             <artifactId>sshd-sftp</artifactId>
-            <version>[2.6.0,)</version>
+            <!--
+            Version 2.17.0 of sshd-sftp is incomplete in Maven Central. It
+            references the parent POM org.apache.sshd:sshd:2.17.0, that does
+            not exist in Maven Central. Projects that use Fake SFTP Server
+            Lambda cannot be built anymore (at least with Maven). Therefore,
+            version 2.17.0 is excluded from the range of supported versions.
+            -->
+            <version>[2.6.0,2.17.0),[2.17.1,)</version>
         </dependency>
         <dependency>
             <groupId>com.github.stefanbirkner</groupId>
