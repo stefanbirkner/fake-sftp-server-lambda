@@ -1,6 +1,7 @@
 # Fake SFTP Server Lambda
 
-[![Build Status](https://travis-ci.org/stefanbirkner/fake-sftp-server-lambda.svg?branch=master)](https://travis-ci.org/stefanbirkner/fake-sftp-server-lambda)
+
+![Build Status](https://github.com/stefanbirkner/fake-sftp-server-lambda/actions/workflows/ci.yml/badge.svg?branch=main)
 
 Fake SFTP Server Lambda runs an in-memory SFTP server while your tests are
 running. It uses the SFTP server of the
