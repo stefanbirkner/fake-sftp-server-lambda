@@ -451,11 +451,19 @@ public class FakeSftpServer {
         String password,
         ServerSession session
     ) {
-        return usernamesAndPasswords.isEmpty()
-            || Objects.equals(
-                usernamesAndPasswords.get(username),
-                password
-            );
+        return isNoUserRegistered()
+            || isCorrectPassword(username, password);
+    }
+
+    private boolean isNoUserRegistered() {
+        return usernamesAndPasswords.isEmpty();
+    }
+
+    private boolean isCorrectPassword(String username, String password) {
+        return Objects.equals(
+            usernamesAndPasswords.get(username),
+            password
+        );
     }
 
     private void ensureDirectoryOfPathExists(
